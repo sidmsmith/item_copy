@@ -36,7 +36,7 @@ CLIENT_SECRET = os.getenv("MANHATTAN_SECRET")
 USAGE_INGEST_URL = os.getenv("MANHATTAN_USAGE_INGEST_URL", "").strip()
 USAGE_INGEST_SECRET = os.getenv("MANHATTAN_USAGE_INGEST_SECRET", "").strip()
 APP_NAME = "item-generator-app"
-APP_VERSION = "1.0.9"
+APP_VERSION = "1.0.10"
 
 
 def get_api_host(environment):
