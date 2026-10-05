@@ -36,7 +36,7 @@ CLIENT_SECRET = os.getenv("MANHATTAN_SECRET")
 USAGE_INGEST_URL = os.getenv("MANHATTAN_USAGE_INGEST_URL", "").strip()
 USAGE_INGEST_SECRET = os.getenv("MANHATTAN_USAGE_INGEST_SECRET", "").strip()
 APP_NAME = "item-generator-app"
-APP_VERSION = "1.0.7"
+APP_VERSION = "1.0.8"
 
 
 def get_api_host(environment):
@@ -270,9 +270,19 @@ def create_item():
         log_api_call("create_item", "POST", url, response=r.text, status_code=r.status_code)
 
         if r.status_code not in (200, 201):
+            # Prefer MAWM's readable per-field messages over the raw (truncated) body,
+            # which otherwise shows only a run of bare error codes like "ITE::029,ITE::029".
+            detail = r.text[:500]
+            try:
+                messages = ((r.json().get("messages") or {}).get("Message")) or []
+                descriptions = [m.get("Description") for m in messages if m.get("Description")]
+                if descriptions:
+                    detail = "; ".join(dict.fromkeys(descriptions))
+            except (json.JSONDecodeError, AttributeError):
+                pass
             return jsonify({
                 "success": False,
-                "error": f"Create failed - API {r.status_code}: {r.text[:500]}",
+                "error": f"Create failed - API {r.status_code}: {detail}",
             })
 
         try:

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Item Copy v1.0.7</title>
+  <title>Item Copy v1.0.8</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -395,6 +395,24 @@
       };
     }
 
+    /**
+     * MAWM rejects packages whose dimensions are null or 0 (ITE::029 "invalid input
+     * for field : Length", etc.), but some source items were imported without them.
+     * Fill any missing value from the item-level value, falling back to 1.
+     */
+    function fillMissingPackageDimensions(item) {
+      const dims = ['Length', 'Width', 'Height', 'Weight', 'Volume'];
+      const uoms = { DimensionUomId: 'in', WeightUomId: 'lb', VolumeUomId: 'cuin' };
+      (item.ItemPackage || []).forEach(pkg => {
+        dims.forEach(f => {
+          if (!(Number(pkg[f]) > 0)) pkg[f] = Number(item[f]) > 0 ? Number(item[f]) : 1;
+        });
+        Object.entries(uoms).forEach(([f, def]) => {
+          if (!pkg[f]) pkg[f] = item[f] || def;
+        });
+      });
+    }
+
     /** Deep-clone an existing package (all fields) for Add Package. */
     function clonePackageForAdd(org, sourceIndex) {
       const pkgs = getPackages();
@@ -689,6 +707,7 @@
         currentItemData = JSON.parse(JSON.stringify(res.itemData));
         applyProfileId(currentItemData, org);
         cleanItemData(currentItemData);
+        fillMissingPackageDimensions(currentItemData);
         populateSummary(currentItemData);
         populatePackages();
 
