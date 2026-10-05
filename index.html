@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Item Copy v1.0.8</title>
+  <title>Item Copy v1.0.9</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -120,6 +120,11 @@
               <input type="text" id="summaryDescription" class="form-control" placeholder="Description" />
               <small class="text-muted">Updates Description and ShortDescription</small>
             </div>
+            <div class="col-12">
+              <label class="form-label">Image URL</label>
+              <input type="url" id="summaryImageUrl" class="form-control" placeholder="https://..." />
+              <small class="text-muted">Updates ImageUrl</small>
+            </div>
           </div>
         </div>
       </div>
@@ -175,6 +180,7 @@
     const createItemButtonSection = document.getElementById('createItemButtonSection');
     const summaryItemId = document.getElementById('summaryItemId');
     const summaryDescription = document.getElementById('summaryDescription');
+    const summaryImageUrl = document.getElementById('summaryImageUrl');
     const packagesAccordion = document.getElementById('packagesAccordion');
     const createItemBtn = document.getElementById('createItemBtn');
     const createItemStatus = document.getElementById('createItemStatus');
@@ -329,6 +335,22 @@
         foldGutter: true,
         gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
       });
+      // Typed/pasted JSON flows back into the summary fields and packages, so they
+      // don't overwrite it on save. setValue() changes have origin 'setValue' and are skipped.
+      let jsonSyncTimer = null;
+      jsonEditor.on('change', (_cm, change) => {
+        if (change.origin === 'setValue') return;
+        clearTimeout(jsonSyncTimer);
+        jsonSyncTimer = setTimeout(() => {
+          try {
+            currentItemData = JSON.parse(jsonEditor.getValue());
+          } catch (e) {
+            return; // mid-edit invalid JSON; wait for the next change
+          }
+          populateSummary(currentItemData);
+          populatePackages();
+        }, 500);
+      });
     }
 
     /** Push summary + package accordion edits into currentItemData and refresh JSON editor. */
@@ -364,11 +386,13 @@
         item.Description = desc;
         item.ShortDescription = desc;
       }
+      item.ImageUrl = summaryImageUrl.value.trim() || null;
     }
 
     function populateSummary(item) {
       summaryItemId.value = item.ItemId || item.itemId || '';
       summaryDescription.value = item.Description || item.description || item.ShortDescription || '';
+      summaryImageUrl.value = item.ImageUrl || item.imageUrl || '';
     }
 
     /** Minimal package used only when the item has no packages yet. */
@@ -617,6 +641,12 @@
 
     function buildItemPayloadForSave() {
       if (!currentItemData) throw new Error('No item data loaded');
+      if (jsonEditorSection.style.display !== 'none' && jsonEditor) {
+        // Pick up JSON typed/pasted in the last 500ms, before the debounced sync ran.
+        currentItemData = parseJsonEditor();
+        populateSummary(currentItemData);
+        populatePackages();
+      }
       syncPackagesFromAccordion();
       syncSummaryToItem(currentItemData);
       let item;
@@ -630,6 +660,7 @@
       const org = getOrg();
       applyProfileId(item, org);
       cleanItemData(item);
+      fillMissingPackageDimensions(item);
       return item;
     }
 
@@ -843,6 +874,7 @@
 
     summaryItemId.addEventListener('input', () => syncUiToCurrentItem());
     summaryDescription.addEventListener('input', () => syncUiToCurrentItem());
+    summaryImageUrl.addEventListener('input', () => syncUiToCurrentItem());
 
     jsonToggleBtn.addEventListener('click', () => {
       const show = jsonEditorSection.style.display === 'none';
